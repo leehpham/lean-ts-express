@@ -12,4 +12,21 @@ describe("express:appInstanceBehavior", () => {
     const app = express();
     expect(typeof app).toBe("function");
   });
+
+  test("application instances have standard HTTP methods, passed", () => {
+    const app = express();
+    expect(typeof app.get).toBe("function");
+  });
+
+  // Integration tests???
+  // test("should respond to defined GET route", async () => {
+  //   const app = express();
+  //   app.get("/hello", (req, res) => {
+  //     res.status(200).json({ message: "Hello" });
+  //   });
+
+  //   const res = await request(app).get("/hello");
+  //   expect(res.status).toBe(200);
+  //   expect(res.body).toEqual({ message: "Hello" });
+  // });
 });
