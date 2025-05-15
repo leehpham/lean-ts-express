@@ -3,5 +3,6 @@ dist
 
 .idea
 
-temp
 .DS_Store
+# For vibe coding
+.temp

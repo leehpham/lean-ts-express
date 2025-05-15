@@ -6,7 +6,7 @@
 import http from "node:http";
 
 import { describe, expect, test } from "@jest/globals";
-import express from "express";
+import express, { NextFunction,Request, Response } from "express";
 import supertest from "supertest";
 
 describe("Express Application", () => {
@@ -111,5 +111,40 @@ describe("Express Application", () => {
 
     // Cleanup
     server.close();
+  });
+
+  test("express(), setting multiple route handlers, executes them in order", async () => {
+    // Arrange
+    const app = express();
+    const executionOrder: number[] = [];
+
+    const cb0 = (_req: Request, _res: Response, next: NextFunction): void => {
+      executionOrder.push(0);
+      next();
+    };
+
+    const cb1 = (_req: Request, _res: Response, next: NextFunction): void => {
+      executionOrder.push(1);
+      next();
+    };
+
+    app.get(
+      "/multi-handler",
+      [cb0, cb1],
+      (_req: Request, _res: Response, next: NextFunction): void => {
+        executionOrder.push(2);
+        next();
+      },
+      (_req: Request, res: Response): void => {
+        executionOrder.push(3);
+        res.json({ executionOrder });
+      }
+    );
+
+    // Act
+    const response = await supertest(app).get("/multi-handler");
+
+    // Assert
+    expect(response.body.executionOrder).toEqual([0, 1, 2, 3]);
   });
 });
