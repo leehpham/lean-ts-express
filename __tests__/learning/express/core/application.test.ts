@@ -6,7 +6,7 @@
 import http from "node:http";
 
 import { describe, expect, test } from "@jest/globals";
-import express, { NextFunction,Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import supertest from "supertest";
 
 describe("Express Application", () => {
@@ -146,5 +146,40 @@ describe("Express Application", () => {
 
     // Assert
     expect(response.body.executionOrder).toEqual([0, 1, 2, 3]);
+  });
+
+  test("express(), path not found, returns 404 status", async () => {
+    // Arrange
+    const app = express();
+    app.get("/exists", (_req, res) => {
+      res.send("This path exists");
+    });
+
+    // Act
+    const response = await supertest(app).get("/not-found");
+
+    // Assert
+    expect(response.status).toBe(404);
+  });
+
+  test("catching errors, synchronous code throws an error, Express catches and processes it", async () => {
+    // Arrange
+    const app = express();
+    app.get("/error", () => {
+      throw new Error("Test error");
+    });
+
+    // Act
+    const response = await supertest(app).get("/error");
+
+    // Assert
+    expect(response.status).toBe(500);
+    // `toContain` is used because `response.text` contains HTML in development mode.
+    expect(response.text).toContain("Test error");
+
+    // TODO: Add another test similar to this one but
+    // with a custom error handling middleware to
+    // format errors consistently.
+    // Check core-application-tests.md for more details.
   });
 });
