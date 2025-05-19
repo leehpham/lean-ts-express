@@ -67,19 +67,30 @@ describe("Express Middleware basics", () => {
     };
     app.use(myMiddleware);
 
+    // Act & Assert
     app.get("/test", (_req, res) => {
       executionOrder.push("route-handler");
       res.json({ executionOrder });
     });
-
-    // Act
     const response = await supertest(app).get("/test");
-
-    // Assert
     expect(response.status).toBe(200);
     expect(response.body.executionOrder).toEqual([
       "app-middleware",
       "route-handler",
+    ]);
+
+    // Reset `executionOrder` for the next request
+    executionOrder.length = 0;
+
+    app.get("/another", (_req, res) => {
+      executionOrder.push("another-route-handler");
+      res.json({ executionOrder });
+    });
+    const anotherResponse = await supertest(app).get("/another");
+    expect(anotherResponse.status).toBe(200);
+    expect(anotherResponse.body.executionOrder).toEqual([
+      "app-middleware",
+      "another-route-handler",
     ]);
   });
 
@@ -175,5 +186,39 @@ describe("Express Middleware basics", () => {
       "third",
       "route-handler",
     ]);
+  });
+
+  test("middleware, using next('route'), skips remaining handlers in current stack", async () => {
+    // Arrange
+    const app = express();
+    const executionOrder: string[] = [];
+
+    // Define a route with multiple handlers
+    app.get(
+      "/test",
+      (_req, _res, next) => {
+        executionOrder.push("first");
+        next("route"); // Skip to the next route
+      },
+      (_req, _res, next) => {
+        // This should be skipped
+        executionOrder.push("skipped");
+        next();
+      }
+    );
+
+    // Next route for the same path
+    app.get("/test", (_req, res) => {
+      executionOrder.push("next-route");
+      res.json({ executionOrder });
+    });
+
+    // Act
+    const response = await supertest(app).get("/test");
+
+    // Assert
+    expect(response.status).toBe(200);
+    expect(response.body.executionOrder).toEqual(["first", "next-route"]);
+    expect(response.body.executionOrder).not.toContain("skipped");
   });
 });
