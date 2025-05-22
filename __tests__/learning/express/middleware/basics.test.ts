@@ -93,6 +93,12 @@ describe("Express Middleware basics", () => {
         "app-middleware",
         "another-route-handler",
       ]);
+
+      // Middleware should also execute for non-existent routes
+      executionOrder.length = 0;
+      const fooRes = await supertest(app).get("/");
+      expect(fooRes.status).toBe(404);
+      expect(executionOrder).toEqual(["app-middleware"]);
     });
 
     test("path-specific, executes only for matching paths", async () => {
@@ -221,6 +227,73 @@ describe("Express Middleware basics", () => {
       expect(response.status).toBe(200);
       expect(response.body.executionOrder).toEqual(["first", "next-route"]);
       expect(response.body.executionOrder).not.toContain("skipped");
+    });
+  });
+
+  describe("router-level middleware", () => {
+    test("no mount path, executes on all routes", async () => {
+      // Arrange
+      const app = express();
+      const router = express.Router();
+      const executionOrder: string[] = [];
+      const middlewareAction = "middleware-action";
+      const routerPath = "/router";
+      const firstPath = "/test";
+      const firstPathAction = "first-path-action";
+      const secondPath = "/another";
+      const secondPathAction = "second-path-action";
+      const nonExistentPath = "/";
+
+      const myMiddleware = (
+        _req: Request,
+        _res: Response,
+        next: NextFunction
+      ): void => {
+        executionOrder.push(middlewareAction);
+        next();
+      };
+
+      // A middleware function with no mount path.
+      // This code is executed for every request to the router.
+      router.use(myMiddleware);
+
+      router.get(firstPath, (_req, res) => {
+        executionOrder.push(firstPathAction);
+        res.json({ executionOrder });
+      });
+
+      router.get(secondPath, (_req, res) => {
+        executionOrder.push(secondPathAction);
+        res.json({ executionOrder });
+      });
+
+      app.use(routerPath, router);
+
+      // Act & Assert
+      const firstRes = await supertest(app).get(`${routerPath}${firstPath}`);
+      expect(firstRes.status).toBe(200);
+      expect(firstRes.body.executionOrder).toEqual([
+        middlewareAction,
+        firstPathAction,
+      ]);
+
+      executionOrder.length = 0;
+
+      const secondRes = await supertest(app).get(`${routerPath}${secondPath}`);
+      expect(secondRes.status).toBe(200);
+      expect(secondRes.body.executionOrder).toEqual([
+        middlewareAction,
+        secondPathAction,
+      ]);
+
+      executionOrder.length = 0;
+
+      // Middleware should also execute for non-existent routes
+      const nonExistentRes = await supertest(app).get(
+        `${routerPath}${nonExistentPath}`
+      );
+      expect(nonExistentRes.status).toBe(404);
+      expect(executionOrder).toEqual([middlewareAction]);
     });
   });
 });
