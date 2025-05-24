@@ -295,5 +295,114 @@ describe("Express Middleware basics", () => {
       expect(nonExistentRes.status).toBe(404);
       expect(executionOrder).toEqual([middlewareAction]);
     });
+
+    test("path-specific, executes only for matching paths", async () => {
+      // Arrange
+      const app = express();
+      const router = express.Router();
+      const executionOrder: string[] = [];
+      const routerPath = "/router";
+      const middlewarePath = "/api";
+      const dataPath = "/data";
+      const middlewareAction = "api-middleware";
+      const dataRouteAction = "api-route-handler";
+      const publicPath = "/public";
+      const publicRouteAction = "public-route-handler";
+      // Path-specific middleware
+      router.use(middlewarePath, (_req, _res, next) => {
+        executionOrder.push(middlewareAction);
+        next();
+      });
+      // The middleware will only execute for this route
+      router.get(`${middlewarePath}${dataPath}`, (_req, res) => {
+        executionOrder.push(dataRouteAction);
+        res.json({ executionOrder });
+      });
+      // This route will NOT execute the middleware
+      router.get(publicPath, (_req, res) => {
+        executionOrder.push(publicRouteAction);
+        res.json({ executionOrder });
+      });
+      app.use(routerPath, router);
+      // Act & Assert
+      // This should execute the path-specific middleware
+      const dataResponse = await supertest(app).get(
+        `${routerPath}${middlewarePath}${dataPath}`
+      );
+      expect(dataResponse.status).toBe(200);
+      expect(dataResponse.body.executionOrder).toEqual([
+        middlewareAction,
+        dataRouteAction,
+      ]);
+      executionOrder.length = 0;
+      // This should not execute the path-specific middleware
+      const publicResponse = await supertest(app).get(
+        `${routerPath}${publicPath}`
+      );
+      expect(publicResponse.status).toBe(200);
+      expect(publicResponse.body.executionOrder).toEqual([publicRouteAction]);
+    });
+
+    test("multiple middlewares in sequence, executes in order", async () => {
+      // Arrange
+      const app = express();
+      const router = express.Router();
+      const executionOrder: string[] = [];
+      const middleware1Action = "first";
+      const middleware2Action = "second";
+      const middleware3Action = "third";
+      const routeHandlerAction = "route-handler";
+      const routerPath = "/router";
+      const testPath = "/test";
+
+      // Multiple middleware functions in sequence
+      const runFirst = (
+        _req: Request,
+        _res: Response,
+        next: NextFunction
+      ): void => {
+        executionOrder.push(middleware1Action);
+        next();
+      };
+      const runSecond = (
+        _req: Request,
+        _res: Response,
+        next: NextFunction
+      ): void => {
+        executionOrder.push(middleware2Action);
+        next();
+      };
+      const runThird = (
+        _req: Request,
+        _res: Response,
+        next: NextFunction
+      ): void => {
+        executionOrder.push(middleware3Action);
+        next();
+      };
+
+      router.use(runFirst);
+      router.use(runSecond);
+      router.use(runThird);
+
+      router.get(testPath, (_req, res) => {
+        executionOrder.push(routeHandlerAction);
+        res.json({ executionOrder });
+      });
+
+      app.use(routerPath, router);
+
+      // Act
+      const response = await supertest(app).get(`${routerPath}${testPath}`);
+
+      // Assert
+      expect(response.status).toBe(200);
+      expect(response.body.executionOrder).toEqual([
+        middleware1Action,
+        middleware2Action,
+        middleware3Action,
+        routeHandlerAction,
+      ]);
+    });
   });
 });
